@@ -2,7 +2,7 @@
 """
 Created on Tue Dec 06 04:18:41 2016
 
-@author: Sergeyу
+@author: Sergey
 """
 
 import numpy as np
@@ -12,18 +12,19 @@ from pandas import read_csv
 import sklearn.linear_model
 import scipy
 
-
+#Вычисляем сигмоиду для вектора
 def fun1(t): 
     z = np.exp(-t)
-    return np.matrix([z[0,i] / (z[0,i] + 1.0) for i in range(z.shape[1])])
-    
+    return np.matrix([1.0 / (z[0,i] + 1.0) for i in range(z.shape[1])])
+
+#Нормализуем данные по строкам признаков   
 def normalize(X):
     
     for i in range(1, X.shape[0]):
-        X[i,:] = (X[i, :] - X[i,:].mean())/X[i,:].var()
+        X[i, :] = (X[i, :] - X[i, :].mean())/X[i, :].var()
         
     return X
-        
+#Загружаем и обрабатываем данные; N - количество данныых в выборке, reg - тестовые данные или обучающая выборка; index - служит для случайной перестановки данных       
 def download_data(N = 100, reg = 'train' , index = [i for i in range(891)]):
     
     data = read_csv('train.csv')
@@ -54,32 +55,35 @@ def download_data(N = 100, reg = 'train' , index = [i for i in range(891)]):
     data = data[index, :]
 
     if (reg == 'train'):
-        data = data[:N,:]
+        data = data[:N,:]#выбор режима
     elif (reg == 'test'):
         data = data[N:,:]
     else:
         raise Exception('Invalid dataset!')
         
-    A = np.matrix([[1 for i in range(data.shape[1])] for j in range(data.shape[0])])
+    A = np.matrix([[1.0 for i in range(data.shape[1])] for j in range(data.shape[0])])
     data = np.matrix(data)
     
     A[:, 1:] = copy.copy(data[:, 1:])
     y = copy.copy(data[:, 0].T)
     
     for i in range(y.shape[1]):
-        if (y[0, i] == 0.0):
+        if (y[0, i] == 0.0):#преобразуем нули в -1
             y[0, i] = -1.0 
             
     X = A.T
     X = normalize(X)
     
-    return   X , y
+    return   X  , y
 
-
-def log_reg_gradient(X, y, epsilon = 0.1, num_iterations = 1, regularization = 1, random = 1, reg_const = 0.25, ordre = 1):
+#осуществляем градиентный спуск, с шагом epsilon, заданным числом итераций, с регуляризацией или без, 
+# random - выбор начального приближения вектора параметров
+#reg_const- константа регуляризации
+#ordre - определяет порядок метода: линейный или Ньютон-Рафсон
+def log_reg_gradient(X, y, epsilon = 0.1, num_iterations = 1, regularization = 0, random = 1, reg_const = 0.25, ordre = 1):
     
     if (random == 1):
-        w =  np.random.rand(X.shape[0])
+        w =  np.random.normal(0, 10, X.shape[0])#np.random.rand(X.shape[0])
     else:
         w = np.ones(X.shape[0])
         
@@ -98,21 +102,22 @@ def log_reg_gradient(X, y, epsilon = 0.1, num_iterations = 1, regularization = 1
                 w = w - epsilon * (grad + w * reg_const)
         else:
             
-            M = np.linalg.pinv(X*((1.0 - z).T * z) * X.T)
+            M = np.linalg.inv(X * ((1.0 - z).T * z) * X.T)
             
             if (regularization == 0):    
-                w =  w - 0.0001 * grad * M.T
+                w =  w -  grad * M.T
             else:
-                w = w - 0.0001 * (grad + w * reg_const) * M.T
+                w = w - (grad + w * reg_const) * M.T
                 
 
-        
-        if np.linalg.norm(grad, 2) < 0.0001:
+        #print(np.linalg.norm(w, 2))
+        if np.linalg.norm(grad, 2) < 0.1:
             break
 
         
     return w
-    
+
+#функция по данной модели W строит предсказания для X(столбцы - прецеденты)
 def predict(W, X, y):
     
     z = [0 for i in range(X.shape[1])]
@@ -124,13 +129,15 @@ def predict(W, X, y):
             z[i] = 1.0
             
     return np.matrix(z) 
-    
+
+#возвращает количество ошибок предсказания
 def test(X, y, w):
     z = predict(w, X, y)  
     a = np.linalg.norm(z - y)
-    return a * a / 4.0         
-
-def plots(Size, regularize = 1, min_grad = 1.0, ind = [i for i in range(891)]):
+    return a * a / 4.0      
+    
+#Возвращает зависимость процента ошибок от числа элементов в тренировочной выборке
+def plots(Size, regularize = 1, ind = [i for i in range(891)]):
 
     L = [500]#[20, 100, 200, 300]+ [500 * i for i in xrange(1,5)]
     
@@ -144,12 +151,12 @@ def plots(Size, regularize = 1, min_grad = 1.0, ind = [i for i in range(891)]):
     size_train = X_train.shape[1]
     
     for i in range(len(L)):
-        print('n = ' + str(L[i]))
+        #print('n = ' + str(L[i]))
         
         if (regularize == 0):
-            w = log_reg_gradient(X_train, y_train, epsilon = 1e-3, num_iterations = L[i], regularization = 0, reg_const = 5, ordre = 2)
+            w = log_reg_gradient(X_train, y_train, epsilon = 1e-3, num_iterations = L[i], regularization = 0, reg_const = 5.0, ordre = 1)
         else:
-            w = log_reg_gradient(X_train, y_train, epsilon = 1e-3, num_iterations = L[i], regularization = 1, reg_const = 5, ordre = 2)
+            w = log_reg_gradient(X_train, y_train, epsilon = 1e-3, num_iterations = L[i], regularization = 1, reg_const = 5.0, ordre = 1)
             
         M_test[i] = test(X_test, y_test, w) / size_test
         M_train[i] = test(X_train, y_train, w) / size_train
@@ -157,7 +164,7 @@ def plots(Size, regularize = 1, min_grad = 1.0, ind = [i for i in range(891)]):
     return (M_train, M_test)
     
     
-    
+# всё то же, что и выше, только с использованием встроенного пакета numpy    
 def np_regression(T, ind = [i for i in range(891)]):
        
     
@@ -186,7 +193,7 @@ def np_regression(T, ind = [i for i in range(891)]):
     return (M_train, M_test)
     
     
-    
+#Сравниваем рукоделье с космическим кораблём numpy
 def compare():
     
     L = [i * 100 for i in range(1,8)]
