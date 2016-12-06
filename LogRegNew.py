@@ -2,7 +2,7 @@
 """
 Created on Tue Dec 06 04:18:41 2016
 
-@author: Sergey
+@author: Sergeyу
 """
 
 import numpy as np
@@ -10,6 +10,7 @@ import random
 import copy
 from pandas import read_csv
 import sklearn.linear_model
+import scipy
 
 
 def fun1(t): 
@@ -72,10 +73,10 @@ def download_data(N = 100, reg = 'train' , index = [i for i in range(891)]):
     X = A.T
     X = normalize(X)
     
-    return   X, y
+    return   X , y
 
 
-def log_reg_gradient(X, y, epsilon = 0.1, num_iterations = 1, regularization = 0, random = 1, reg_const = 0.25, ordre = 1):
+def log_reg_gradient(X, y, epsilon = 0.1, num_iterations = 1, regularization = 1, random = 1, reg_const = 0.25, ordre = 1):
     
     if (random == 1):
         w =  np.random.rand(X.shape[0])
@@ -84,20 +85,32 @@ def log_reg_gradient(X, y, epsilon = 0.1, num_iterations = 1, regularization = 0
         
     w = np.matrix(w)
     
-    if (ordre == 1):
 
-        for j in range(num_iterations):
-            
-            grad = (fun1(w * X) - y) * X.T
-            
+    for j in range(num_iterations):
+        
+        z = fun1(w * X)
+        grad = (z - y) * X.T
+        
+        if (ordre == 1):
             if (regularization == 0):    
                 w =  w - epsilon * grad
             else:
                 w = w - epsilon * (grad + w * reg_const)
-            print np.linalg.norm(w)
-            if np.linalg.norm(grad, 2) < 0.0001:
-                break
-    
+        else:
+            
+            M = np.linalg.pinv(X*((1.0 - z).T * z) * X.T)
+            
+            if (regularization == 0):    
+                w =  w - 0.0001 * grad * M.T
+            else:
+                w = w - 0.0001 * (grad + w * reg_const) * M.T
+                
+
+        
+        if np.linalg.norm(grad, 2) < 0.0001:
+            break
+
+        
     return w
     
 def predict(W, X, y):
@@ -119,7 +132,7 @@ def test(X, y, w):
 
 def plots(Size, regularize = 1, min_grad = 1.0, ind = [i for i in range(891)]):
 
-    L = [1500]#[20, 100, 200, 300]+ [500 * i for i in xrange(1,5)]
+    L = [500]#[20, 100, 200, 300]+ [500 * i for i in xrange(1,5)]
     
     M_test = [0 for i in xrange(len(L))]
     M_train = [0 for i in xrange(len(L))]
@@ -134,9 +147,9 @@ def plots(Size, regularize = 1, min_grad = 1.0, ind = [i for i in range(891)]):
         print('n = ' + str(L[i]))
         
         if (regularize == 0):
-            w = log_reg_gradient(X_train, y_train, epsilon = 1e-3, num_iterations = L[i], regularization = 0, reg_const = 5, ordre = 1)
+            w = log_reg_gradient(X_train, y_train, epsilon = 1e-3, num_iterations = L[i], regularization = 0, reg_const = 5, ordre = 2)
         else:
-            w = log_reg_gradient(X_train, y_train, epsilon = 1e-3, num_iterations = L[i], regularization = 1, reg_const = 5, ordre = 1)
+            w = log_reg_gradient(X_train, y_train, epsilon = 1e-3, num_iterations = L[i], regularization = 1, reg_const = 5, ordre = 2)
             
         M_test[i] = test(X_test, y_test, w) / size_test
         M_train[i] = test(X_train, y_train, w) / size_train
